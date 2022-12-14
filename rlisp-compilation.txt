@@ -1,0 +1,31 @@
+Compilable with lexical binding?
+
+*** Must load esl first! ***
+
+Evaluate (setq lexical-binding t) with the file open in a buffer, then
+byte-compile it.
+
+array.red  	   OK
+block.red	   OK but *REDUCE4, FNAME* should be declared fluid
+form.red	   OK but ALGLIST*, *ADJPREC should be declared fluid
+forstat.red	   OK
+infix.red	   OK
+inter.red	   OK but CURSYM* should be declared fluid
+io.red		   OK
+list.red	   OK
+loops.red	   OK
+lpri.red	   OK
+module.red	   OK but ALGLIST*, LISPSYSTEM* should be declared fluid
+newtok.red	   OK
+parser.red	   OK
+proc.red	   OK but EOF*, *REDUCE4 should be declared fluid
+rlisp.red	   OK
+rsupport.red   OK
+slfns.red	   OK
+smacro.red	   OK
+statmisc.red   OK
+superv.red	   OK but CRCHAR*, ALGLIST*, *RLISP88 should be declared fluid
+switch.red	   OK
+tok.red		   OK but *BACKTRACE should be declared fluid
+where.red	   OK
+xread.red	   OK
