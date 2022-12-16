@@ -17,7 +17,7 @@ For simplicity and stability during initial development, I am currently using th
 
 [REDUCE](https://reduce-algebra.sourceforge.io/) is a Computer Algebra System written in Standard Lisp that normally runs on PSL (Portable Standard Lisp) or CSL (Codemist Standard Lisp).  Both PSL and CSL were essentially developed to run REDUCE.
 
-The aim of this project is to provide an emulation of Standard Lisp and modified versions of some of the files in the REDUCE source directories `util` and `packages/support` in order to build REDUCE in Emacs, running on Emacs Lisp.  The file `esl.el` provides a partial emulation of Standard Lisp (enough to run REDUCE) and forms the main interface between REDUCE and Emacs.  I refer to this emulation as Emacs Standard Lisp or ESL.  To avoid name clashes between Emacs Lisp and Standard Lisp, ESL uses primarily a upper-case, although this is invisible to normal REDUCE users because the REDUCE UI translates case as necessary.
+The aim of this project is to provide an emulation of Standard Lisp and modified versions of some of the files in the REDUCE source directories `util` and `packages/support` in order to build REDUCE in Emacs, running on Emacs Lisp.  The file `esl.el` provides a partial emulation of Standard Lisp (enough to run REDUCE) and forms the main interface between REDUCE and Emacs.  I refer to this emulation as Emacs Standard Lisp or ESL.  To avoid name clashes between Emacs Lisp and Standard Lisp, ESL uses primarily upper-case, although this is invisible to normal REDUCE users because the REDUCE UI translates case as necessary.
 
 The file `boot.el` is the ESL version of the REDUCE file `boot.sl`, which I have edited to use upper case and replace `%` with `;` and `!`  with `\` where necessary so that Emacs Lisp can read it.  However, it retains `lambda`, `nil`, `quote` and `t` as lower-case symbols.
 
@@ -25,7 +25,9 @@ Files with names of the form `eslxxxx.red` are ESL versions of the REDUCE files 
 
 ## Building Emacs REDUCE
 
-Download the current ESL file set to some directory, which I will call `REDUCE`, but its name is not significant.  Download the directory
+The primary repository for this project is on [GitHub](https://github.com/fjwright/Emacs-REDUCE) but every so often I will upload what I regard as a reasonably stable and usefully improved snapshot to the secondary repository on [SourceForge](https://sourceforge.net/p/reduce-algebra/code/HEAD/tree/trunk/generic/emacs/REDUCE).
+
+Download the files in this repository (or clone it) to some directory, which I will call `REDUCE`, but its name is not significant.  Download the directory
 
 https://sourceforge.net/p/reduce-algebra/code/HEAD/tree/historical/r38/packages
 
