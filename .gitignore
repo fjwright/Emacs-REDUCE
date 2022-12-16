@@ -1,5 +1,6 @@
-TAGS
-fasl/
-log/
 *.elc
 *~
+fasl/
+log/
+packages
+TAGS
