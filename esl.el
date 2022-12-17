@@ -1,14 +1,14 @@
-;;; esl.el --- ESL (Emacs Standard LISP) -*- lexical-binding:t -*-
+;;; esl.el --- ESL (Emacs Standard Lisp) -*- lexical-binding:t -*-
 
-;; Copyright (C) 2017-2018 Francis J. Wright
+;; Copyright (C) 2017-2018, 2022 Francis J. Wright
 
-;; Author: Francis J. Wright <https://sourceforge.net/u/fjwright>
+;; Author: Francis J. Wright <https://sites.google.com/site/fjwcentaur>
 ;; Created: 17 Nov 2017
-;; Version: $Id: esl.el 4800 2018-10-11 17:45:34Z fjwright $
+;; Time-stamp: <2022-12-17 17:46:56 franc>
+;; Version: 0.2alpha
 ;; Keywords: languages
-;; Homepage: https://sourceforge.net/p/reduce-algebra/code/HEAD/tree/trunk/generic/emacs/REDUCE/
-;; Package-Version: 0.1
-;; Package-Requires: ((emacs "25") cl-lib)
+;; Homepage: https://github.com/fjwright/Emacs-REDUCE
+;; Package-Requires: ((emacs "27"))
 
 ;; This file is not part of GNU Emacs.
 
@@ -27,12 +27,12 @@
 
 ;;; Commentary:
 
-;; This file aims to provide an emulation of most of Standard LISP
-;; (enough to run REDUCE) as an upper-case LISP (to keep it distinct
-;; from the underlying Emacs Lisp). However, lambda must be kept lower
-;; case.  READ and FEXPRs are not implemented, and the only way to
-;; input Standard LISP is to use the Emacs Lisp reader with Emacs Lisp
-;; syntax.
+;; This file aims to provide an emulation of most of Standard Lisp
+;; (enough to run REDUCE) as an upper-case lisp (to keep it distinct
+;; from the underlying Emacs Lisp).  However, lambda must be kept
+;; lower case.  READ and FEXPRs are not implemented, and the only way
+;; to input Standard Lisp is to use the Emacs Lisp reader with Emacs
+;; Lisp syntax.
 
 ;; Some functions that correspond to Emacs Lisp special forms or subrs
 ;; (built-in functions) must be defined as macros rather than aliases,
@@ -41,10 +41,14 @@
 ;;; Primitive Data Types
 ;;; ====================
 
-;; integer -- Elisp integers are of fixed size (61 bits) but Slisp
-;; integers are of arbitrary size, which I currently provide by
-;; calling functions in the GNU Emacs Calculator ("Calc") package by
-;; Dave Gillespie.
+;; integer -- Slisp integers are of arbitrary size but the size of
+;; Elisp 27+ (bignum) integers is limited by the value of
+;; ‘integer-width’: their absolute value must less than
+;; 2^integer-width.  On my computer integer-width = 65536, which
+;; corresponds to nearly 20,000 decimal digits!  Note that, because an
+;; integer may be either a fixnum or a bignum, equal integers may not
+;; be ‘eq’ and only the equality predicates ‘eql’ and ‘=’ should be
+;; used to compare integers.
 
 ;; floating -- 1. is an integer in Elisp but a float in
 ;; Slisp.  Otherwise probably OK.
@@ -83,18 +87,13 @@
 ;;; Code:
 
 ;; I use the GNU Emacs Common Lisp Emulation library mainly to support
-;; the Standard LISP `PROG' form, but I also need it in Emacs 25 for
+;; the Standard Lisp `PROG' form, but I also need it in Emacs 25 for
 ;; `GENSYM'.  Also, Emacs 26 provides the `cxxxxr' family of functions
-;; but Emacs 25 only provides `cxxr', so I use the Standard LISP
+;; but Emacs 25 only provides `cxxr', so I use the Standard Lisp
 ;; `CXXXXR' functions, which I have defined exactly as in Emacs 26.
 
 (require 'cl-lib)
 (require 'seq)				 ; necessary in batch mode -- no idea why!
-
-;; I also use the GNU Emacs Calc library for arbitrary length integers.
-
-(require 'calc)
-(require 'calc-ext)
 
 ;;; System GLOBAL Variables
 ;;; =======================
@@ -151,7 +150,7 @@ modified by SET or SETQ."))
 
 (defvar *RAISE t					  ; ESL uses upper case internally
   "*RAISE = NIL global
-If !*RAISE is non-NIL all characters input through Standard LISP
+If !*RAISE is non-NIL all characters input through Standard Lisp
 input/output functions will be raised to upper case. If !*RAISE is
 NIL characters will be input as is.")
 
@@ -165,7 +164,7 @@ modified by SET or SETQ."))
 
 (put 'T 'GLOBAL t)
 
-;; Not Standard LISP but PSL and assumed by REDUCE:
+;; Not Standard Lisp but PSL and assumed by REDUCE:
 (defvar *ECHO nil
   "*echo = [Initially: nil] switch
 The switch echo is used to control the echoing of input. When (on echo)
@@ -187,22 +186,13 @@ is printed whenever a function is redefined by PUTD.")
 ;;; Elementary Predicates
 ;;; =====================
 
-;; (defmacro ATOM (u)				   ; boot.el does not compile if alias
-;;   "ATOM(U:any):boolean eval, spread
-;; Returns T if U is not a pair.
-;; EXPR PROCEDURE ATOM(U);
-;;    NULL PAIRP U;"
-;;   (declare (debug t))
-;;   `(or (atom ,u) (math-integerp ,u)))
-
-;; Above macro doesn't work, I think because `u' gets evaluated twice.
-
-(defun ATOM (u)
+(defmacro ATOM (u)				   ; boot.el does not compile if alias
   "ATOM(U:any):boolean eval, spread
 Returns T if U is not a pair.
 EXPR PROCEDURE ATOM(U);
    NULL PAIRP U;"
-  (or (atom u) (math-integerp u)))
+  (declare (debug t))
+  `(atom ,u))
 
 (defalias 'CODEP 'functionp
   "CODEP(U:any):boolean eval, spread
@@ -213,18 +203,17 @@ Returns T if U is a function-pointer.")
 Returns T if U is a constant (a number, string, function-pointer, or vector).
 EXPR PROCEDURE CONSTANTP(U);
    NULL OR(PAIRP U, IDP U);"
-  (null (or (symbolp u) (PAIRP u))))
+  (null (or (consp u) (symbolp u))))
 
 (defalias 'EQ 'eq
   "EQ(U:any, V:any):boolean eval, spread
 Returns T if U points to the same object as V. EQ is not a reliable
 comparison between numeric arguments.")
 
-(defun EQN (u v)
+(defalias 'EQN 'eql
   "EQN(U:any, V:any):boolean eval, spread
 Returns T if U and V are EQ or if U and V are numbers and have
-the same value and type."
-  (or (eql u v) (math-equal u v)))
+the same value and type.")
 
 (defalias 'EQUAL 'equal
   "EQUAL(U:any, V:any):boolean eval, spread
@@ -234,7 +223,7 @@ have identical dimensions and EQUAL values in all
 positions. Strings must have identical characters. Function
 pointers must have EQ values. Other atoms must be EQN equal.")
 
-(defalias 'FIXP 'math-integerp
+(defalias 'FIXP 'integerp
   "FIXP(U:any):boolean eval, spread
 Returns T if U is an integer (a fixed number).")
 
@@ -252,8 +241,7 @@ Returns T if U is a number and less than 0. If U is not a number
 or is a positive number, NIL is returned.
 EXPR PROCEDURE MINUSP(U);
    IF NUMBERP U THEN LESSP(U, 0) ELSE NIL;"
-  (cond ((numberp u) (< u 0))
-		((math-integerp u) (math-negp u))))
+  (and (numberp u) (< u 0)))
 
 (defalias 'NULL 'null
   "NULL(U:any):boolean eval, spread
@@ -261,12 +249,11 @@ Returns T if U is NIL.
 EXPR PROCEDURE NULL(U);
    U EQ NIL;")
 
-(defun NUMBERP (u)
+(defalias 'NUMBERP 'numberp
   "NUMBERP(U:any):boolean eval, spread
 Returns T if U is a number (integer or floating).
 EXPR PROCEDURE NUMBERP(U);
-   IF OR(FIXP U, FLOATP U) THEN T ELSE NIL;"
-  (or (numberp u) (math-integerp u)))
+   IF OR(FIXP U, FLOATP U) THEN T ELSE NIL;")
 
 (defun ONEP (u)
   "ONEP(U:any):boolean eval, spread.
@@ -274,14 +261,11 @@ Returns T if U is a number and has the value 1 or 1.0. Returns NIL
 otherwise.
 EXPR PROCEDURE ONEP(U);
    OR(EQN(U, 1), EQN(U, 1.0));"
-  (if (math-integerp u)
-	  (math-equal u 1)
-	(eql u 1.0)))
+  (and (numberp u) (= u 1)))
 
-(defun PAIRP (u)
+(defalias 'PAIRP 'consp
   "PAIRP(U:any):boolean eval, spread
-Returns T if U is a dotted-pair."
-  (and (consp u) (not (math-integerp u))))
+Returns T if U is a dotted-pair.")
 
 (defalias 'STRINGP 'stringp
   "STRINGP(U:any):boolean eval, spread
@@ -297,8 +281,7 @@ Returns T if U is a number and has the value 0 or 0.0. Returns
 NIL otherwise.
 EXPR PROCEDURE ZEROP(U);
    OR(EQN(U, 0), EQN(U, 0.0));"
-  (cond ((numberp u) (zerop u))
-		((math-integerp u) (math-zerop u))))
+  (and (numberp u) (zerop u)))
 
 
 ;;; Functions on Dotted-Pairs
@@ -540,8 +523,8 @@ fewer than N elements, an out of range error occurs.
 	(cond ((null l) (range-error))
 		  ((onep n) (first l))
 		  (t (nth (rest l) (sub1 n)))))
-Note that this definition is not compatible with Common LISP. The
-Common LISP definition reverses the arguments and defines the car
+Note that this definition is not compatible with Common Lisp. The
+Common Lisp definition reverses the arguments and defines the car
 of a list to be the \"zeroth\" element."
   (nth (1- n) l))
 
@@ -562,14 +545,10 @@ an out of range error occurs.
 ;;; Identifiers
 ;;; ===========
 
-(defun esl-string-to-bigint (s)
-  "Convert string S to a bigint."
-  (math-read-number s))
-
 (defun COMPRESS (u)
   "COMPRESS(U:id-list):{atom-vector} eval, spread
 U is a list of single character identifiers which is built into a Standard
-LISP entity and returned. Recognized are numbers, strings, and
+Lisp entity and returned. Recognized are numbers, strings, and
 identifiers with the escape character prefixing special characters. The
 formats of these items appear in \"Primitive Data Types\" section 2.1
 on page 3. Identifiers are not interned on the OBLIST. Function
@@ -592,7 +571,7 @@ identifier to facilitate direct access to Emacs Lisp symbols."
   ;; Otherwise, assume an identifier. Any ! characters should be
   ;; deleted, except that !! should be replaced by !.
   ;; However, retain a leading !: (except in special cases) to prevent
-  ;; a Standard LISP identifier being an Elisp keyword.  This should
+  ;; a Standard Lisp identifier being an Elisp keyword.  This should
   ;; perhaps be handled in a more consistent way!
   (if (equal u '(T)) 't
 	(let* ((s (mapconcat #'symbol-name u ""))
@@ -602,12 +581,13 @@ identifier to facilitate direct access to Emacs Lisp symbols."
 			 (replace-regexp-in-string "\"\"" "\"" (substring s 1 -1)))
 			((or (eq s0 ?-)
 				 (and (>= s0 ?0) (<= s0 ?9))) ; NUMBER
+             ;; ***** TIDY UP THE FOLLOWING SEXP! *****
 			 (if (string-match "\\." s)
 				 ;; Number is a float. (Emacs does not accept .E as in
 				 ;; 123.E-2 so delete such a ".".)
 				 (string-to-number (replace-regexp-in-string "\\.E" "E" s))
 			   ;; Number is a (possibly big) integer.
-			   (esl-string-to-bigint s)))
+			   (string-to-number s)))
 			(t							; IDENTIFIER
 			 (let ((l (length s)) (i 0) (ss nil) e)
 			   ;; Retain leading !: in "!:..." but not in "!:", "!:!="
@@ -628,14 +608,6 @@ identifier to facilitate direct access to Emacs Lisp symbols."
 				 (if (and (eq (aref ss 0) ?) (> (length ss) 1))
 					 (setq ss (downcase (substring ss 1)))))
 			   (make-symbol ss)))))))	; uninterned symbol
-
-(defun esl-bigint-p (b)
-  "Return t if B is a bigint."
-  (math-integerp b))
-
-(defun esl-bigint-to-string (b)
-  "Convert bigint B to a string."
-  (math-format-number b))
 
 (defun EXPLODE (u)
   "EXPLODE(U:{atom}-{vector}):id-list eval, spread
@@ -658,7 +630,6 @@ string, or function-pointer."
   (seq-map
    (lambda (c) (intern (string c)))
    (cond ((or (stringp u) (numberp u)) (prin1-to-string u))
-		 ((esl-bigint-p u) (esl-bigint-to-string u))
 		 ;; Assume identifier -- must insert ! before a leading digit and
 		 ;; before any special characters in string without \ escapes:
 		 (t (let* ((s (prin1-to-string u t)) (l (length s))
@@ -817,12 +788,12 @@ Returns the removed property or NIL if there was no such indicator."
 ;; to the COMPLETE function call, so `DM' and `PUTD' must modify the
 ;; macro argument list within the body lambda expression.
 
-;; Ref. Standard LISP Report, page 9: "When a macro invocation is
+;; Ref. Standard Lisp Report, page 9: "When a macro invocation is
 ;; encountered, the body of the macro, a lambda expression, is invoked
 ;; as a NOEVAL, NOSPREAD function with the macro's invocation bound as
 ;; a list to the macros single formal parameter."
 
-;; REDUCE handles macros specially, assuming they are Standard LISP
+;; REDUCE handles macros specially, assuming they are Standard Lisp
 ;; macros, whereas ESL functions that are actually defined as Emacs
 ;; Lisp macros need to be handled by REDUCE as if they were
 ;; EXPRs. Therefore, it is important that the function type defaults
@@ -984,7 +955,7 @@ from GLOBAL to FLUID is not permissible and results in the error:
 				  (mapcan
 				   (lambda (x)
 					 `((with-no-warnings ; suppress warning about lack of prefix
-						 (defvar ,x nil "Standard LISP fluid variable."))
+						 (defvar ,x nil "Standard Lisp fluid variable."))
 					   (unless (FLUIDP ',x)
 						 (esl--fluid ',x))))
 				   (eval idlist))))
@@ -1027,7 +998,7 @@ results in the error:
 				  (mapcan
 				   (lambda (x)
 					 `((with-no-warnings ; suppress warning about lack of prefix
-						 (defvar ,x nil "Standard LISP global variable."))
+						 (defvar ,x nil "Standard Lisp global variable."))
 					   (unless (GLOBALP ',x)
 						 (esl--global ',x))))
 				   (eval idlist))))
@@ -1189,7 +1160,7 @@ of RETURN results in the error:
 (defun ERROR (number message)
   "ERROR(NUMBER:integer, MESSAGE:any) eval, spread
 NUMBER and MESSAGE are passed back to a surrounding ERRORSET (the
-Standard LISP reader has an ERRORSET). MESSAGE is placed in the
+Standard Lisp reader has an ERRORSET). MESSAGE is placed in the
 global variable EMSG!* and the error number becomes the value of
 the surrounding ERRORSET. FLUID variables and local bindings are
 unbound to return to the environment of the ERRORSET. Global
@@ -1216,10 +1187,10 @@ standard output device is not open. The message appears prefixed
 with 5 asterisks. The MESSAGE list is displayed without top level
 parentheses. The MESSAGE from the ERROR call will be available in
 the global variable EMSG!*. The exact format of error messages
-generated by Standard LISP functions described in this document
+generated by Standard Lisp functions described in this document
 are not fixed and should not be relied upon to be in any
 particular form. Likewise, error numbers generated by Standard
-LISP functions are implementation dependent.
+Lisp functions are implementation dependent.
 If no error occurs during the evaluation of U, the value of
   (LIST (EVAL U)) is returned.
 If an error has been signaled and the value of TR is non-NIL a
@@ -1231,7 +1202,7 @@ dependent format."
 	(condition-case err			  ; error description variable
 		(list (eval u))			  ; protected form
 	  (user-error-no-message nil) ; error1 called -- no message or debugging
-	  ((user-error debug)		  ; Standard LISP error
+	  ((user-error debug)		  ; Standard Lisp error
 	   (if msgp
 		   (let ((msg (cddr err)))
 			 (message "***** %s"
@@ -1348,54 +1319,21 @@ END;"
 ;;; Arithmetic Functions
 ;;; ====================
 
-;; Run the Calc library quietly:
-(setq calc-display-working-message nil)
-
-(defmacro bigpos (&rest digits)
-  "Return a big integer representation.
-A call of the form (bigpos d1 ... dn) is self-quoting; the result
-of evaluating it is the big integer representation itself."
-  ;; cf. the definition of `lambda' in "subr.el".
-  (list 'quote (cons 'bigpos digits)))
-
-(defmacro bigneg (&rest digits)
-  "Return a big integer representation.
-A call of the form (bigneg d1 ... dn) is self-quoting; the result
-of evaluating it is the big integer representation itself."
-  ;; cf. the definition of `lambda' in "subr.el".
-  (list 'quote (cons 'bigneg digits)))
-
-(defun esl--arith-op2 (op math-op u v)
-  "OP(U:number, V:number); MATH-OP is math-integer version of OP."
-  (if (math-integerp u)
-	  (if (math-integerp v)
-		  (funcall math-op u v)
-		;; v is a float or invalid:
-		(funcall op (FLOAT u) v))
-	;; u is a float or invalid:
-	(funcall op u (FLOAT v))))
-
-(defun ABS (u)
+(defalias 'ABS 'abs
   "ABS(U:number):number eval, spread
 Returns the absolute value of its argument.
 EXPR PROCEDURE ABS(U);
-   IF LESSP(U, 0) THEN MINUS(U) ELSE U;"
-  (if (numberp u)
-	  (abs u)
-	;; u is a math-integer or invalid:
-	(math-abs u)))
+   IF LESSP(U, 0) THEN MINUS(U) ELSE U;")
 
-(defun ADD1 (u)
+(defalias 'ADD1 '1+
   "ADD1(U:number):number eval, spread
 Returns the value of U plus 1 of the same type as U (fixed or floating).
 EXPR PROCEDURE ADD1(U);
-   PLUS2(U, 1);"
-  (PLUS2 u 1))
+   PLUS2(U, 1);")
 
-(defun DIFFERENCE (u v)
+(defalias 'DIFFERENCE '-
   "DIFFERENCE(U:number, V:number):number eval, spread
-The value U - V is returned."
-  (esl--arith-op2 #'- #'math-sub u v))
+The value U - V is returned.")
 
 (defun DIVIDE (u v)
   "DIVIDE(U:number, V:number):dotted-pair eval, spread
@@ -1406,58 +1344,21 @@ attempted:
 ***** Attempt to divide by 0 in DIVIDE
 EXPR PROCEDURE DIVIDE(U, V);
    (QUOTIENT(U, V) . REMAINDER(U, V));"
-  (cons (QUOTIENT u v) (REMAINDER u v)))
+  (cons (/ u v) (% u v)))
 
-;; (EXPT 10 40) overflows!
-;; (defun EXPT (u v)
-;;  "EXPT(U:number, V:integer):number eval, spread
-;; Returns U raised to the V power. A floating point U to an integer
-;; power V does not have V changed to a floating number before
-;; exponentiation."
-;;  (cond ((and (numberp u) (numberp v)) (expt u v))
-;; 	   ((math-integerp u) (math-pow u v))
-;; 	   ;; u is a float, v is a math-integer, u^v = e^(ln(u)*v):
-;; 	   ;; THIS VIOLATES THE SPECIFICATION!
-;; 	   (t (exp (* (log u) (FLOAT v))))))
-
-(defun EXPT (u v)
+(defalias 'EXPT 'expt                   ; DOES THIS WORK NOW?
  "EXPT(U:number, V:integer):number eval, spread
 Returns U raised to the V power. A floating point U to an integer
 power V does not have V changed to a floating number before
-exponentiation."
- (cond ((math-integerp u) (math-pow u v))
-	   ((and (floatp u) (numberp v)) (expt u v))
-	   ;; u is a float, v is a math-integer, u^v = e^(ln(u)*v):
-	   ;; THIS VIOLATES THE SPECIFICATION!
-	   (t (exp (* (log u) (FLOAT v))))))
+exponentiation.")
 
-;; The IEEE binary64 format (https://en.wikipedia.org/wiki/IEEE_754)
-;; uses a 53-bit significand (s) and 11-bit exponent (e).  If the
-;; (binary) exponent is 53 or more then the float has zero fractional
-;; part, so truncating it cannot lose digits.  An Elisp integer uses
-;; 61 bits (range 2**61 - 1 to -2**61), so a float with exponent up to
-;; 60 should truncate reliably to an Elisp integer.  Choose a maximum
-;; exponent value (emax) between 53 and 60 and only truncate a float
-;; with exponent <= emax to reliably obtain an accurate Elisp integer.
-
-(defun FIX (u)
+(defalias 'FIX 'truncate                ; does THIS WORK NOW?
   "FIX(U:number):integer eval, spread
 Returns an integer which corresponds to the truncated value of U.
 The result of conversion must retain all significant portions of U. If
-U is an integer it is returned unchanged."
-  (if (math-integerp u)
-	  u
-	;; u is a float:
-	(let* ((emax 58)
-		   (s.e (frexp u))				; s float: 0.5 <= s < 1.0
-		   (e (cdr s.e)))				; e integer: u = s*2^e
-	  (if (<= e emax)
-		  (truncate u)
-		(math-mul (truncate (ldexp (car s.e) emax)) ; (s*2^emax) *
-				  (math-pow 2 (- e emax)))			; (2^(e-emax))
-		))))
+U is an integer it is returned unchanged.")
 
-(defun FLOAT (u)
+(defalias 'FLOAT 'float
   "FLOAT(U:number):floating eval, spread
 The floating point number corresponding to the value of the
 argument U is returned.  Some of the least significant digits of
@@ -1465,101 +1366,70 @@ an integer may be lost do to the implementation of floating point
 numbers.  FLOAT of a floating point number returns the number
 unchanged.  If U is too large to represent in floating point an
 error occurs:
-***** Argument to FLOAT is too large"
-  ;; Convert ANY number U to a native ELisp float.
-  (if (numberp u)
-	  (float u)
-	;; math-float returns `MANT * 10^EXP' as `(float MANT EXP)'
-	(let ((me (cdr (math-float u))))
-	  (* (car me) (expt 10.0 (cadr me))))))
+***** Argument to FLOAT is too large")
 
-(defun GREATERP (u v)
+(defalias 'GREATERP '>
   "GREATERP(U:number, V:number):boolean eval, spread
-Returns T if U is strictly greater than V, otherwise returns NIL."
-  (esl--arith-op2 #'< #'math-lessp v u))
+Returns T if U is strictly greater than V, otherwise returns NIL.")
 
-(defun LESSP (u v)
+(defalias 'LESSP '<
   "LESSP(U:number, V:number):boolean eval, spread
-Returns T if U is strictly less than V, otherwise returns NIL."
-  (esl--arith-op2 #'< #'math-lessp u v))
+Returns T if U is strictly less than V, otherwise returns NIL.")
 
-(defmacro MAX (&rest u)
+(defalias 'MAX 'max
   "MAX([U:number]):number noeval, nospread, or macro
 Returns the largest of the values in U. If two or more values are the
 same the first is returned.
 MACRO PROCEDURE MAX(U);
-   EXPAND(CDR U, 'MAX2);"
-  (EXPAND u 'MAX2))
+   EXPAND(CDR U, 'MAX2);")
 
-(defun MAX2 (u v)
+(defalias 'MAX2 'max
   "MAX2(U:number, V:number):number eval, spread
 Returns the larger of U and V. If U and V are the same value U is
 returned (U and V might be of different types).
 EXPR PROCEDURE MAX2(U, V);
-   IF LESSP(U, V) THEN V ELSE U;"
-  (if (LESSP u v) v u))
+   IF LESSP(U, V) THEN V ELSE U;")
 
-(defmacro MIN (&rest u)
+(defalias 'MIN 'min
   "MIN([U:number]):number noeval, nospread, or macro
 Returns the smallest of the values in U. If two or more values are the
 same the first of these is returned.
 MACRO PROCEDURE MIN(U);
-   EXPAND(CDR U, 'MIN2);"
-  (EXPAND u 'MIN2))
+   EXPAND(CDR U, 'MIN2);")
 
-(defun MIN2 (u v)
+(defalias 'MIN2 'min
   "MIN2(U:number, V:number):number eval, spread
 Returns the smaller of its arguments. If U and V are the same value,
 U is returned (U and V might be of different types).
 EXPR PROCEDURE MIN2(U, V);
-   IF GREATERP(U, V) THEN V ELSE U;"
-  (if (GREATERP u v) v u))
+   IF GREATERP(U, V) THEN V ELSE U;")
 
-(defun MINUS (u)
+(defalias 'MINUS '-
   "MINUS(U:number):number eval, spread
 Returns -U.
 EXPR PROCEDURE MINUS(U);
-   DIFFERENCE(0, U);"
-  (if (numberp u)
-	  (- u)
-	;; u is a math-integer or invalid:
-	(math-neg u)))
+   DIFFERENCE(0, U);")
 
-(defmacro PLUS (&rest u)
+(defalias 'PLUS '+
   "PLUS([U:number]):number noeval, nospread, or macro
 Forms the sum of all its arguments.
 MACRO PROCEDURE PLUS(U);
-   EXPAND(CDR U, 'PLUS2);"
-  (declare (debug t))
-  (EXPAND u #'PLUS2))
+   EXPAND(CDR U, 'PLUS2);")
 
-(defun PLUS2 (u v)
+(defalias 'PLUS2 '+
   "PLUS2(U:number, V:number):number eval, spread
-Returns the sum of U and V."
-  (esl--arith-op2 #'+ #'math-add u v))
+Returns the sum of U and V.")
 
-(defun esl-xor (u v)
-  "(exclusive-or U V)"
-  (cond (u (not v)) (v (not u))))
-
-(defun esl--math-integer-quotient (u v)
-  "Correct quotient of math-integers U and V."
-  (let ((w (math-quotient (math-abs u) (math-abs v))))
-	(if (esl-xor (math-negp u) (math-negp v))
-		(math-neg w)
-	  w)))
-
-(defun QUOTIENT (u v)
+(defalias 'QUOTIENT '/
   "QUOTIENT(U:number, V:number):number eval, spread
 The quotient of U divided by V is returned. Division of two positive
 or two negative integers is conventional. When both U and V are
 integers and exactly one of them is negative the value returned is
 the negative truncation of the absolute value of U divided by the
 absolute value of V. An error occurs if division by zero is attempted:
-***** Attempt to divide by 0 in QUOTIENT"
-  (esl--arith-op2 #'/ #'esl--math-integer-quotient u v))
+***** Attempt to divide by 0 in QUOTIENT")
 
-(defun REMAINDER (u v)
+(defalias 'REMAINDER '%
   "REMAINDER(U:number, V:number):number eval, spread
 If both U and V are integers the result is the integer remainder of
 U divided by V. If either parameter is floating point, the result is
@@ -1569,29 +1439,24 @@ both are negative the remainder is positive. An error occurs if V is
 zero:
 ***** Attempt to divide by 0 in REMAINDER
 EXPR PROCEDURE REMAINDER(U, V);
-   DIFFERENCE(U, TIMES2(QUOTIENT(U, V), V));"
-  (DIFFERENCE u (TIMES2 (QUOTIENT u v) v)))
+   DIFFERENCE(U, TIMES2(QUOTIENT(U, V), V));")
 
-(defun SUB1 (u)
+(defalias 'SUB1 '1-
   "SUB1(U:number):number eval, spread
 Returns the value of U less 1. If U is a FLOAT type number, the
 value returned is U less 1.0.
 EXPR PROCEDURE SUB1(U);
-   DIFFERENCE(U, 1);"
-  (DIFFERENCE u 1))
+   DIFFERENCE(U, 1);")
 
-(defmacro TIMES (&rest u)
+(defalias 'TIMES '*
   "TIMES([U:number]):number noeval, nospread, or macro
 Returns the product of all its arguments.
 MACRO PROCEDURE TIMES(U);
-   EXPAND(CDR U, 'TIMES2);"
-  (declare (debug t))
-  (EXPAND u #'TIMES2))
+   EXPAND(CDR U, 'TIMES2);")
 
-(defun TIMES2 (u v)
+(defalias 'TIMES2 '*
   "TIMES2(U:number, V:number):number eval, spread
-Returns the product of U and V."
-  (esl--arith-op2 #'* #'math-mul u v))
+Returns the product of U and V.")
 
 ;; Fast built-in small integer (inum) arithmetic:
 
@@ -1881,7 +1746,7 @@ EXPR PROCEDURE SUBLIS(X, Y);
 	  y
 	(let ((u (assoc y x)))
 	  (cond (u (cdr u))
-			((ATOM y) y)
+			((atom y) y)
 			(t (cons (SUBLIS x (car y)) (SUBLIS x (cdr y))))))))
 
 (defun SUBST (u v w)
@@ -1895,7 +1760,7 @@ EXPR PROCEDURE SUBST(U, V, W);
       ELSE SUBST(U, V, CAR W) . SUBST(U, V, CDR W);"
   (cond ((null w) nil)
 		((equal v w) u)
-		((ATOM w) w)
+		((atom w) w)
 		(t (cons (SUBST u v (car w)) (SUBST u v (cdr w))))))
 
 
@@ -2030,7 +1895,7 @@ saved when it is closed.")
 (defconst esl--write-prefix-length (length esl--write-prefix)
   "Length of `esl--write-prefix' string.")
 
-(defconst esl--default-output-buffer-name "*Standard LISP*"
+(defconst esl--default-output-buffer-name "*Standard Lisp*"
   "The name of the terminal window buffer.")
 
 (defvar esl--default-output-buffer nil
@@ -2076,13 +1941,13 @@ LENGTH function is exceeded."
   nil)
 
 (defvar esl--linelength 80
-  "Current Standard LISP line length accessed via function `LINELENGTH'.")
+  "Current Standard Lisp line length accessed via function `LINELENGTH'.")
 
 (defun LINELENGTH (len)
   "LINELENGTH(LEN:{integer, NIL}):integer eval, spread
 If LEN is an integer the maximum line length to be printed before
 the print functions initiate an automatic TERPRI is set to the value
-LEN. No initial Standard LISP line length is assumed. The previous
+LEN. No initial Standard Lisp line length is assumed. The previous
 line length is returned except when LEN is NIL. This special case
 returns the current line length and does not cause it to be reset. An
 error occurs if the requested line length is too large for the currently
@@ -2134,7 +1999,7 @@ ejects will occur."
   nil)
 
 (defvar esl--posn 0
-  "Number of characters in the current line output by Standard LISP.
+  "Number of characters in the current line output by Standard Lisp.
 Accessed (read-only) via the function `POSN'.
 It's value should be between 0 and `esl--linelength' inclusive.")
 
@@ -2215,7 +2080,6 @@ are displayed in list-notation and vectors in vector-notation."
   ;; correctly, but the output should be readable!
   (cond ((symbolp u) (esl--prin-string (esl--prin1-id-to-string u)))
 		((not (consp u)) (esl--prin-string (prin1-to-string u)))
-		((esl-bigint-p u) (esl--prin-string (esl-bigint-to-string u)))
 		(t (esl--prin-string "(")
 		   (PRIN1 (car u))
 		   (esl--prin1-cdr (cdr u))
@@ -2257,7 +2121,6 @@ vectors in vector-notation. The value of U is returned."
   ;; correctly, but the output should be readable!
   (cond ((symbolp u) (esl--prin-string (esl--prin2-id-to-string u)))
 		((not (consp u)) (esl--prin-string (prin1-to-string u t)))
-		((esl-bigint-p u) (esl--prin-string (esl-bigint-to-string u)))
 		(t (esl--prin-string "(")
 		   (PRIN2 (car u))
 		   (esl--prin2-cdr (cdr u))
@@ -2283,7 +2146,7 @@ dependent internal name which is a value returned by OPEN. If
 FILEHANDLE is NIL the standard input device is selected. When end
 of file is reached on a non-standard input device, the standard
 input device is reselected. When end of file occurs on the
-standard input device the Standard LISP reader terminates. RDS
+standard input device the Standard Lisp reader terminates. RDS
 returns the internal name of the previously selected input file.
 ***** FILEHANDLE could not be selected for input"
   (let (stream)
@@ -2435,10 +2298,10 @@ is non-nil then echo file input."
 			   ;; Might get \n in pasted text:
 			   (if (eq c ?\n) $EOL$ (esl--readch-char-to-interned-id c)))))
 	   ;; Read from interaction buffer:
-	   (with-current-buffer "*Standard LISP*"
+	   (with-current-buffer "*Standard Lisp*"
 		 (goto-char esl--marker)
 		 ;; When end of file occurs on the standard input device the
-		 ;; Standard LISP reader terminates. [NOT YET IMPLEMENTED.]
+		 ;; Standard Lisp reader terminates. [NOT YET IMPLEMENTED.]
 		 (cond ((eobp) $EOF$)
 			   ((eolp) (forward-line)
 				(set-marker esl--marker (point)) $EOL$)
@@ -2483,14 +2346,14 @@ selected output file.
 			standard-output (or stream esl--default-output-buffer)))))
 
 
-;;; LISP Reader
+;;; Lisp Reader
 ;;; ===========
 
 ;; Interaction via Emacs based on the standard read-eval-print loop.
 
 ;; From the ELisp Manual:
 
-;; `t' used as a stream means that the input is read from the
+;; ‘t’ used as a stream means that the input is read from the
 ;; minibuffer.  In fact, the minibuffer is invoked once and the text
 ;; given by the user is made into a string that is then used as the
 ;; input stream.  If Emacs is running in batch mode, standard input is
@@ -2502,11 +2365,11 @@ selected output file.
 ;; Use the above approach to make READCH read from the minibuffer.
 
 (define-derived-mode esl-standard-lisp-interaction-mode
-  lisp-interaction-mode "SLISP Interaction"
-  "Major mode for entering and evaluating Standard LISP forms.")
+  lisp-interaction-mode "Slisp Interaction"
+  "Major mode for entering and evaluating Standard Lisp forms.")
 
 (defun STANDARD-LISP ()
-  "Run Standard LISP with input via the minibuffer and output via a buffer."
+  "Run Standard Lisp with input via the minibuffer and output via a buffer."
   ;; EXPR PROCEDURE STANDARD!-LISP();
   ;; BEGIN SCALAR VALUE;
   ;;    RDS NIL; WRS NIL;
@@ -2532,20 +2395,20 @@ selected output file.
 		;; Make (READCH) read from the minibuffer:
 		(esl--readch-use-minibuffer t))
 	(if (= (buffer-size) 0)
-		(princ "Standard LISP"))
+		(princ "Standard Lisp"))
 	(RDS nil) (WRS nil)
 	(catch 'QUIT
 	  (while t
 		(terpri)
 		(princ "Eval: ")
 		(setq value (ERRORSET '(eval (esl--read-and-echo)) t t))
-		(unless (ATOM value)
+		(unless (atom value)
 		  (terpri)
 		  (princ "====> ") (princ (car value)) (terpri))))))
 
 (defun QUIT ()
   "QUIT()
-Causes termination of the LISP reader and control to be
+Causes termination of the Lisp reader and control to be
 transferred to the operating system."
   (throw 'QUIT nil))
 
@@ -2560,12 +2423,12 @@ transferred to the operating system."
     (define-key map "\e\C-x" 'esl-read-eval-print)
     (define-key map "\C-j" 'esl-read-eval-print)
     map)
-  "Keymap for Standard LISP interaction mode.
+  "Keymap for Standard Lisp interaction mode.
 Most commands are inherited from `lisp-interaction-mode-map'.")
 
 (define-derived-mode esl-interaction-mode
-  lisp-interaction-mode "SLISP Interaction"
-  "Major mode for entering and evaluating Standard LISP forms."
+  lisp-interaction-mode "Slisp Interaction"
+  "Major mode for entering and evaluating Standard Lisp forms."
   (make-local-variable 'comment-start)
   (setq comment-start "%")
   ;; Always advance point in this buffer's window when text is inserted:
@@ -2574,14 +2437,14 @@ Most commands are inherited from `lisp-interaction-mode-map'.")
   )
 
 (defun esl-run (rlisp-mode)
-  "Run Standard LISP with IO via a buffer."
+  "Run Standard Lisp with IO via a buffer."
   (interactive "P")
   (switch-to-buffer
    (setq esl--default-output-buffer
 		 (get-buffer-create esl--default-output-buffer-name)))
   (esl-interaction-mode)
   (let ((standard-output (set-marker esl--marker 1)))
-	(princ "Standard LISP") (terpri)
+	(princ "Standard Lisp") (terpri)
 	(terpri) (princ "Eval: "))
   (when rlisp-mode
 	(load-file "boot.elc")
@@ -2595,7 +2458,7 @@ Most commands are inherited from `lisp-interaction-mode-map'.")
 		(standard-output esl--marker)
 		value)
 	(setq value (ERRORSET '(eval (read)) t t))
-	(unless (ATOM value)
+	(unless (atom value)
 	  (terpri) (terpri) (princ "====> ") (princ (car value)))
 	(terpri) (terpri) (princ "Eval: ")
 	;; Output does not necessarily advance point, so...
@@ -2605,14 +2468,14 @@ Most commands are inherited from `lisp-interaction-mode-map'.")
 	(forward-line -1)))
 
 (defun esl-eval-print-last-sexp ()
-  "Copy sexp before point to end of *Standard LISP* buffer.
-Then evaluate it and print value into *Standard LISP* buffer."
+  "Copy sexp before point to end of *Standard Lisp* buffer.
+Then evaluate it and print value into *Standard Lisp* buffer."
   (interactive)
   (let ((sexp (buffer-substring-no-properties
 			   (save-excursion (backward-sexp) (point))
 			   (point))))
 	(save-current-buffer
-	  (set-buffer "*Standard LISP*")
+	  (set-buffer "*Standard Lisp*")
 	  (insert sexp)
 	  (esl-read-eval-print nil)
 	  )))
@@ -2641,17 +2504,13 @@ Then evaluate it and print value into *Standard LISP* buffer."
 (defun EXPLODE2 (u)
   "(explode2 U:atom-vector): id-list expr
 PRIN2-like version of EXPLODE without escapes or double quotes."
-  ;; NB: This function may need more work.  It will not explode a
-  ;; vector containing big integers correctly!
   (seq-map
    (lambda (c) (intern (string c)))
-   (if (esl-bigint-p u)
-	   (esl-bigint-to-string u)
-	 (prin1-to-string u t))))
+   (prin1-to-string u t)))
 
 (defun INT2ID (i)
   "(int2id I:integer): id expr
-Converts an integer to an id; this refers to the I'th id in the id space. Since
+Converts an integer to an id; this refers to the I’th id in the id space. Since
 0 ... 255 correspond to ASCII characters, int2id with an argument in this
 range converts an ASCII code to the corresponding single character id. The
 id NIL is always found by (int2id 128)."
@@ -2929,7 +2788,7 @@ deleted then `print' would suffice!"
 (defun esl--faslout-explode-override (u)
   "As (EXPLODE U) but using Emacs Lisp syntax.
 Used for faslout Lisp generation, which must be Emacs Lisp,
-not Standard LISP, since it will be compiled by Emacs."
+not Standard Lisp, since it will be compiled by Emacs."
   (seq-map
    (lambda (c) (intern (string c)))
    (prin1-to-string u)))

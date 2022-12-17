@@ -1,7 +1,9 @@
 # Emacs REDUCE
 **The REDUCE Computer Algebra System running on Emacs Lisp in an Emacs buffer**
 
-**[Francis Wright](https://sites.google.com/site/fjwcentaur)**, December 2022
+**[Francis Wright](https://sites.google.com/site/fjwcentaur)**
+
+Version 0.2alpha, December 2022
 
 ---
 
@@ -13,7 +15,7 @@ Somewhat to my amazement, the Emacs REDUCE that I built in October 2018 using wh
 
 **This project is strictly for amusement only!  It may crash Emacs and I strongly recommend running it alone in an instance of Emacs that you are not also using for anything important.**
 
-For simplicity and stability during initial development, I am currently using the [REDUCE 3.8 source files](https://sourceforge.net/p/reduce-algebra/code/HEAD/tree/historical/r38).
+For simplicity and stability during initial development, I am currently using the [REDUCE 3.8 source files](https://sourceforge.net/p/reduce-algebra/code/HEAD/tree/historical/r38).  Emacs REDUCE version 0.2 requires Emacs 27 or later for bignum support, i.e. arbitrarily large integers.
 
 [REDUCE](https://reduce-algebra.sourceforge.io/) is a Computer Algebra System written in Standard Lisp that normally runs on PSL (Portable Standard Lisp) or CSL (Codemist Standard Lisp).  Both PSL and CSL were essentially developed to run REDUCE.
 
@@ -127,10 +129,14 @@ With the above two changes, `arith/arith.tst` appears to run correctly.  There a
 ## To do
 
 * Optimization.
-* Better support for big integers: revert from using Calc to native integers and require Emacs 27 or later; see `NEWS.27`.
+* Review support for the `CXXXXR` functions.
 * Better user interface.
 * Switch to the current version of REDUCE.
 * Use lexical binding for REDUCE where possible.  This **appears** to work for the `rlisp` package without any modification to the REDUCE source code, but it needs to be automated and tested more generally.  Free (undeclared) variables **appear** to be bound appropriately.  Need to save the compile logs when generating fasl files.
 * The Lisp `READ` function is used in a few places in REDUCE and so needs to be implemented better than at present.
 * Investigate rounding of floats, which seems to differ from the exemplary test logs.  This may just be because the REDUCE 3.8 logs are nearly 20 years old.  If current Lisps all use essentially the same C libraries then the rounding should be the same in all REDUCE implementations (maybe).
 * Native compilation; requires Emacs 28 or later.
+
+## Main updates since version 0.1
+
+* Remove use of the Calc package for bignums, which was introduced in SVN r4726 on 2018-08-14.  Use Emacs 27+ native bignums instead, which simplifies the code quite a lot and should be faster.
