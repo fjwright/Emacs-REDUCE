@@ -12,8 +12,10 @@ if [ ! -d log ]; then mkdir log; fi
 
 date > log/remake.log
 
-# tmprint is very Lisp-specific, doesn't build and would not be useful anyway at present in Emacs Lisp, so commented out:
-packages='support rlisp alg poly polydiv arith mathpr ezgcd factor hephys int matrix rlisp88 rprint fmprint pretty solve desir ineq modsr rsolve algint arnum assist dummy cantens atensor avector invbase misc boolean cedit rcref ftr reset cali camal changevr compact dfpart lie' # tmprint'
+# support is empty, so no point building it, and tmprint is very
+# Lisp-specific, doesn't build and would not be useful anyway at
+# present in Emacs Lisp, so both are commented out:
+packages='rlisp alg poly polydiv arith mathpr ezgcd factor hephys int matrix rlisp88 rprint fmprint pretty solve desir ineq modsr rsolve algint arnum assist dummy cantens atensor avector invbase misc boolean cedit rcref ftr reset cali camal changevr compact dfpart lie' # support tmprint
 
 for x in $packages; do echo $x >> log/remake.log; ./remake-one-package.sh $x; done
 

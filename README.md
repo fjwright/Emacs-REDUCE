@@ -43,18 +43,19 @@ https://sourceforge.net/p/reduce-algebra/code/HEAD/tree/historical/r38
 
 somewhere and regard this directory as the directory `REDUCE` (which will then include a lot of files that are not required for this build), or link the directory `packages` and/or file `package.red` to `REDUCE`.
 
-Open a (Unix-style) command shell and execute
+Ensure that a suitable version of `emacs` is in the search path for the shell you intend to use.  Open a (Unix-style) command shell and execute
 
 ```sh
 . build-core-reduce.sh
 ```
+
 and then
 
 ```sh
 . remake-all-packages.sh
 ```
 
-This build should take about 10 minutes.
+This build should take around 20 minutes in total.
 
 ## Running Emacs REDUCE
 

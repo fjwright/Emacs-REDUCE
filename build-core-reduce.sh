@@ -18,7 +18,8 @@ if [ ! -d fasl ]; then mkdir fasl; fi
 emacs \
 	--batch \
 	--directory=. \
-	--eval='(setq debug-on-error t)' \
+	--eval="(add-to-list 'load-path nil)" \
+	--eval="(setq debug-on-error t)" \
 	--load=build \
 	<< EOF
 (DSKIN "dbuild.el")

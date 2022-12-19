@@ -254,11 +254,21 @@ remflag('(boundp gcdn smallcompress), 'lose);
 % debugging awkward.  Use the Elisp built-in function instead:
 symbolic procedure boundp u; !boundp u;
 
-% Provide a numerical greatest common divisor that should work better
-% with ESL big integers than the version in "alg/numsup.red" by using
-% the Calc package:
-symbolic procedure gcdn(u,v); !c!a!l!c!F!u!n!c!-!g!c!d(u,v);
-%  U and v are integers. Value is absolute value of gcd of u and v.
+symbolic procedure gcdn(u,v);
+   % Numerical greatest common divisor.
+   % U and v are integers. Return absolute value of gcd of u and v.
+   % if v = 0 then abs u else gcdn(v,remainder(u,v));
+   % Non-recursive version because the recursive version in
+   % "alg/numsup.red" causes stack overflow in Emacs REDUCE 3.8 when
+   % building defint and fps.
+   begin scalar tmp;
+      while v neq 0 do <<
+         tmp := v;
+         v := remainder(u,v);
+         u := tmp
+      >>;
+      return abs u
+   end;
 
 % Down-case the E in floats if appropriate:
 symbolic procedure smallcompress (li);

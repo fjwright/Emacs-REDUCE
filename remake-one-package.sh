@@ -25,7 +25,8 @@ if getopts f force; then force=t; else force=nil; fi
 emacs \
 	--batch \
 	--directory=. \
-	--eval='(setq debug-on-error t)' \
+	--eval="(add-to-list 'load-path nil)" \
+	--eval="(setq debug-on-error t)" \
 	--load=reduce \
 	&> log/$1.blg << EOF
 symbolic;
