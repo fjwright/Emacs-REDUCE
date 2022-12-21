@@ -21,5 +21,5 @@ date >> log/testall.log
 
 echo 'Errors:'
 cd log
-grep '\*\*\*\*\*\|error[^.]' *.rlg
+grep -E '^[^%*]*(\*{5}[^*]|error[^.])' *.rlg
 cd ..

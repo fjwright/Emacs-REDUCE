@@ -31,8 +31,7 @@ date >> log/remake.log
 
 echo 'Errors:'
 cd log
-# support.elc is known to be empty, so exclude the consequential error message:
-grep --exclude=support.blg '\*\*\*\*\*\|error' *.blg
+grep -E '^[^%*]*(\*{5}[^*]|error[^.])' *.blg
 cd ..
 
 echo $'\a'

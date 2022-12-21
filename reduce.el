@@ -7,11 +7,15 @@
 ;; Interactive input from minibuffer and output to normal buffer.
 ;; Batch mode input from stdin and output to stdout.
 
-(add-to-list 'load-path nil)
+(eval-and-compile (add-to-list 'load-path nil))
 
 (require 'esl)							; defines LOAD-MODULE
 
 (setq max-specpdl-size 3000)			; default of 1300 too small
+
+(defvar *MSG nil
+  "REDUCE flag controlling message printing.
+Defined in “alg/intro.red”.")
 
 ;; Load core modules quietly:
 (let ((*MSG nil))

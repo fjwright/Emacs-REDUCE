@@ -4,7 +4,7 @@
 
 ;; Author: Francis J. Wright <https://sites.google.com/site/fjwcentaur>
 ;; Created: 17 Nov 2017
-;; Time-stamp: <2022-12-17 17:46:56 franc>
+;; Time-stamp: <2022-12-21 16:06:00 franc>
 ;; Version: 0.2alpha
 ;; Keywords: languages
 ;; Homepage: https://github.com/fjwright/Emacs-REDUCE
@@ -2320,6 +2320,7 @@ is non-nil then echo file input."
 The current print line is terminated."
   (setq esl--posn 0)
   (terpri)
+  (redisplay t)                         ; necessary with file input
   nil)
 
 (defun WRS (filehandle)
